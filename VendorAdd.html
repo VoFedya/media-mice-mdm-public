@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<base target="_top">
+
+<style>
+
+body{
+    font-family:Arial,sans-serif;
+    padding:15px;
+}
+
+input{
+    width:100%;
+    padding:10px;
+    box-sizing:border-box;
+    margin-bottom:15px;
+}
+
+.vendor{
+    border:1px solid #ddd;
+    border-radius:8px;
+    padding:10px;
+    margin-bottom:10px;
+}
+
+.name{
+    font-weight:bold;
+    font-size:15px;
+}
+
+button{
+    margin-top:10px;
+}
+
+#duplicateBox{
+    margin:12px 0;
+}
+
+.duplicate{
+    border:1px solid #fbbc04;
+    background:#fff8e1;
+    border-radius:8px;
+    padding:10px;
+    margin-bottom:10px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<h2>Vendor Finder</h2>
+
+<input
+    id="search"
+    placeholder="Search vendors..."
+>
+
+<div id="duplicateBox"></div>
+
+<div id="results">
+Loading...
+</div>
+
+<hr>
+
+<button onclick="toggleCreateVendor()">
+➕ New Vendor
+</button>
+
+<div id="createVendor"></div>
+
+<script>
+
+let vendors = [];
+
+const searchBox = document.getElementById("search");
+const results = document.getElementById("results");
+
+google.script.run
+    .withSuccessHandler(function(data){
+
+        vendors = data;
+
+        render(vendors);
+
+    })
+    .getVendorSearch();
+
+searchBox.addEventListener("input", searchVendors);
+
+function searchVendors(){
+
+    const query =
+        searchBox.value.trim().toLowerCase();
+
+    if(query === ""){
+
+        render(vendors);
+        return;
+
+    }
+
+    const matches = vendors.filter(v =>
+
+        (v.name || "").toLowerCase().includes(query) ||
+
+        (v.email || "").toLowerCase().includes(query) ||
+
+        (v.website || "").toLowerCase().includes(query)
+
+    );
+
+    render(matches);
+
+}
+
+function render(list){
+
+    if(list.length === 0){
+
+        results.innerHTML = `
+            <p>No vendors found.</p>
+        `;
+
+        return;
+
+    }
+
+    results.innerHTML = list.map((v,index) => `
+
+        <div class="vendor">
+
+            <div
+                onclick="toggle(${index})"
+                style="cursor:pointer;"
+            >
+
+                <div class="name">
+
+                    <span id="arrow-${index}">
+                        ▶
+                    </span>
+
+                    ${v.name}
+
+                </div>
+
+                <div>
+                    ${v.type}
+                </div>
+
+            </div>
+
+            <div
+                id="details-${index}"
+                style="display:none;margin-top:10px;"
+            >
+
+                ${v.contact ? `
+                    👤 ${v.contact}<br><br>
+                ` : ""}
+
+                ${v.email ? `
+                    ✉ ${v.email}<br><br>
+                ` : ""}
+
+                ${v.website ? `
+                    🌐 <a href="https://${v.website}" target="_blank">${v.website}</a><br><br>
+                ` : ""}
+
+                ${v.portfolio ? `
+                    📁 <a href="${v.portfolio}" target="_blank">Portfolio</a><br><br>
+                ` : ""}
+
+                ${v.country ? `
+                    📍 ${v.city}, ${v.country}
+                ` : ""}
+
+            </div>
+
+        </div>
+
+    `).join("");
+
+}
+
+function toggle(index){
+
+    const details =
+        document.getElementById(`details-${index}`);
+
+    const arrow =
+        document.getElementById(`arrow-${index}`);
+
+    if(details.style.display === "block"){
+
+        details.style.display = "none";
+        arrow.textContent = "▶";
+
+    }else{
+
+        details.style.display = "block";
+        arrow.textContent = "▼";
+
+    }
+
+}
+
+function toggleCreateVendor(){
+
+    const div =
+        document.getElementById("createVendor");
+
+    if(div.innerHTML !== ""){
+
+        div.innerHTML = "";
+        return;
+
+    }
+
+    div.innerHTML = `
+
+        <hr>
+
+        <h3>Create Vendor</h3>
+
+        <input
+            id="vendorName"
+            placeholder="Vendor Name"
+            value="${searchBox.value.trim()}"
+        >
+
+        <input
+            id="vendorType"
+            placeholder="Vendor Type"
+        >
+
+        <input
+            id="vendorEmail"
+            placeholder="Email"
+        >
+
+        <input
+            id="vendorWebsite"
+            placeholder="Website"
+        >
+
+        <input
+            id="contactPerson"
+            placeholder="Contact Person"
+        >
+
+        <input
+            id="portfolio"
+            placeholder="Portfolio"
+        >
+
+        <button onclick="createVendor()">
+            Save Vendor
+        </button>
+
+    `;
+
+}
+
+function createVendor(){
+
+    const vendor = {
+
+        name:
+            document.getElementById("vendorName").value.trim(),
+
+        type:
+            document.getElementById("vendorType").value.trim(),
+
+        email:
+            document.getElementById("vendorEmail").value.trim(),
+
+        website:
+            document.getElementById("vendorWebsite").value.trim(),
+
+        contact:
+            document.getElementById("contactPerson").value.trim(),
+
+        portfolio:
+            document.getElementById("portfolio").value.trim()
+
+    };
+
+    google.script.run
+        .withSuccessHandler(function(matches){
+
+            if(matches.length > 0){
+
+                showDuplicates(matches);
+
+                return;
+
+            }
+
+            showDuplicates([]);
+
+            createVendorAnyway();
+
+        })
+        .checkVendor(vendor);
+
+}
+
+function createVendorAnyway(){
+
+    const vendor = {
+
+        name:
+            document.getElementById("vendorName").value.trim(),
+
+        type:
+            document.getElementById("vendorType").value.trim(),
+
+        email:
+            document.getElementById("vendorEmail").value.trim(),
+
+        website:
+            document.getElementById("vendorWebsite").value.trim(),
+
+        contact:
+            document.getElementById("contactPerson").value.trim(),
+
+        portfolio:
+            document.getElementById("portfolio").value.trim()
+
+    };
+
+    google.script.run
+        .withSuccessHandler(function(){
+
+            alert("Vendor created." + vendorId);
+
+            showDuplicates([]);
+
+            document.getElementById("createVendor").innerHTML = "";
+
+            searchBox.value = "";
+
+            google.script.run
+                .withSuccessHandler(function(data){
+
+                    vendors = data;
+
+                    render(vendors);
+
+                })
+                .getVendorSearch();
+
+        })
+        .createVendor(vendor);
+
+}
+
+function showDuplicates(matches){
+
+    const box =
+        document.getElementById("duplicateBox");
+
+    if(matches.length === 0){
+
+        box.innerHTML = "";
+        return;
+
+    }
+
+    box.innerHTML = `
+
+        ${matches.map(v => `
+
+            <div class="duplicate">
+
+                <b>⚠ Possible duplicate</b>
+
+                <br><br>
+
+                <b>${v.name}</b><br>
+
+                <span style="color:#666;">
+                    ${v.reasons.map(r => `✓ ${r}`).join("<br>")}
+                </span>
+
+                <br><br>
+
+                ${v.type ? `
+                    📂 ${v.type}<br><br>
+                ` : ""}
+
+                ${v.contact ? `
+                    👤 ${v.contact}<br><br>
+                ` : ""}
+
+                ${v.email ? `
+                    ✉ ${v.email}<br><br>
+                ` : ""}
+
+                ${v.website ? `
+                    🌐
+                    <a href="https://${v.website}" target="_blank">
+                        Website: ${v.website}
+                    </a>
+                    <br><br>
+                ` : ""}
+
+                ${v.portfolio ? `
+                    📁
+                    <a href="${v.portfolio}" target="_blank">
+                        Portfolio
+                    </a>
+                    <br><br>
+                ` : ""}
+
+                <small>ID: ${v.id}</small>
+
+            <br><br>
+
+        <button onclick="createVendorAnyway()">
+            Ignore & Create Vendor
+        </button>
+
+    </div>
+
+    `).join("")}
+
+  `;
+
+}
+
+</script>
+
+</body>
+
+</html>

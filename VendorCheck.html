@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+  <base target="_top">
+
+  <style>
+
+    body{
+      font-family:Arial,sans-serif;
+      padding:15px;
+    }
+
+    h2{
+      margin-top:0;
+    }
+
+    .section{
+      margin-bottom:20px;
+    }
+
+    .title{
+      font-weight:bold;
+      margin-bottom:8px;
+    }
+
+    .card{
+      border:1px solid #ddd;
+      border-radius:8px;
+      padding:10px;
+      background:#fafafa;
+    }
+
+    .success{
+      color:#188038;
+    }
+
+    .warning{
+      color:#e37400;
+    }
+
+    .error{
+      color:#d93025;
+    }
+
+  </style>
+
+</head>
+
+<body>
+
+<h2>Vendor Review</h2>
+
+<button onclick="loadVendor()">
+  🔄 Refresh
+</button>
+
+<br><br>
+
+<div id="queue" class="section"></div>
+
+<div id="exact" class="section"></div>
+
+<div id="fuzzy" class="section"></div>
+
+<div id="recommendation" class="section"></div>
+
+<div id="differences" class="section"></div>
+
+<script>
+
+let currentRow = null;
+
+loadVendor();
+
+function loadVendor() {
+
+  google.script.run
+    .withSuccessHandler(render)
+    .checkVendorRequest();
+
+}
+
+function render(data){
+  
+  currentRow = data.row;
+
+  document.getElementById("queue").innerHTML = `
+    <div class="title">
+      Queue Vendor (Row ${data.row})
+    </div>
+
+    <div class="card">
+
+      <b>${data.queue.vendorName}</b><br>
+
+      ${data.queue.vendorType}<br><br>
+
+      📧 ${data.queue.email || "-"}<br>
+      🌐 ${data.queue.website || "-"}
+
+    </div>
+  `;
+
+  document.getElementById("exact").innerHTML = `
+
+  <div class="title">
+    Exact Matches
+  </div>
+
+  <div class="card">
+
+    <div>
+      Vendor ID:
+      ${
+        data.exact.vendorId
+          ? `<span class="success">✅ ${data.exact.vendorId.vendorId}</span>`
+          : `<span class="error">❌ No Match</span>`
+      }
+    </div>
+
+    <br>
+
+    <div>
+      Website:
+      ${
+        data.exact.website
+          ? `<span class="success">✅ ${data.exact.website.vendorId}</span>`
+          : `<span class="error">❌ No Match</span>`
+      }
+    </div>
+
+    <br>
+
+    <div>
+      Email:
+      ${
+        data.exact.email
+          ? `<span class="success">✅ ${data.exact.email.vendorId}</span>`
+          : `<span class="error">❌ No Match</span>`
+      }
+    </div>
+
+  </div>
+
+  `;
+
+  let fuzzyHtml = `
+
+  <div class="title">
+    Possible Matches
+  </div>
+
+  <div class="card">
+
+  `;
+
+  if (data.fuzzy.length === 0) {
+
+    fuzzyHtml += `
+      <span class="error">
+        ❌ No similar vendors found
+      </span>
+    `;
+
+  } else {
+
+    data.fuzzy.forEach(match => {
+
+      fuzzyHtml += `
+
+        <div style="margin-bottom:10px;">
+
+          <b>${match.vendorName}</b><br>
+
+          🆔 ${match.vendorId}<br>
+
+          ⭐ ${match.score}% match
+
+        </div>
+
+      `;
+
+    });
+
+  }
+
+  fuzzyHtml += `</div>`;
+
+  document.getElementById("fuzzy").innerHTML = fuzzyHtml;
+
+  let recommendation = "";
+  let button = "";
+
+  if (
+    data.exact.vendorId ||
+    data.exact.website ||
+    data.exact.email
+  ) {
+
+    recommendation = `
+      <span class="success">
+        ✅ Existing Vendor Found
+      </span>
+    `;
+
+  } else if (data.fuzzy.length > 0) {
+
+    recommendation = `
+      <span class="warning">
+        ⚠ Possible Duplicate
+      </span>
+      <br>
+      Review before creating a new vendor.
+    `;
+
+  } else {
+
+    recommendation = `
+      <span class="success">
+        ➕ New Vendor
+      </span>
+    `;
+
+    button = `
+      <br><br>
+      <button onclick="createNewVendor()">
+        ➕ Create Vendor
+      </button>
+    `;
+
+  }
+
+  document.getElementById("recommendation").innerHTML = `
+
+  <div class="title">
+    Recommendation
+  </div>
+
+  <div class="card">
+    ${recommendation}
+    ${button}
+  </div>
+
+  `;
+
+  let differencesHtml = `
+
+  <div class="title">
+    Differences
+  </div>
+
+  <div class="card">
+
+  `;
+
+  if (Object.keys(data.differences).length === 0) {
+
+    differencesHtml += `
+      <span class="success">
+        ✅ No differences found
+      </span>
+    `;
+
+  } else {
+
+    for (const field in data.differences) {
+
+      const difference = data.differences[field];
+
+      differencesHtml += `
+
+        <div style="margin-bottom:15px;">
+
+          <b>${field}</b>
+
+          <hr>
+
+          <table style="width:100%; border-collapse:collapse;">
+
+            <tr>
+              <td style="font-weight:bold; width:90px;">
+                Master
+              </td>
+              <td>
+                ${difference.master || "-"}
+                <br>
+                <label>
+                  <input
+                    type="radio"
+                    name="${field}"
+                    value="master"
+                    checked>
+                  Keep Master
+                </label>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="font-weight:bold;">
+                Submitted
+              </td>
+              <td>
+                ${difference.submitted || "-"}
+                <br>
+                <label>
+                  <input
+                    type="radio"
+                    name="${field}"
+                    value="submitted">
+                  Use Submitted
+                </label>
+              </td>
+            </tr>
+
+          </table>
+
+        </div>
+
+      `;
+
+    }
+
+  }
+
+  differencesHtml += `
+
+    <br>
+
+    <button onclick="approveVendor()">
+      Approve
+    </button>
+
+  </div>
+
+  `;
+
+  document.getElementById("differences").innerHTML =
+    differencesHtml;
+
+}
+
+
+function approveVendor() {
+
+  const selections = {};
+
+  document
+    .querySelectorAll('input[type="radio"]:checked')
+    .forEach(input => {
+
+      selections[input.name] = input.value;
+
+    });
+
+  google.script.run
+    .withSuccessHandler(function() {
+
+      alert("Approved.");
+
+      loadVendor();
+
+    })
+    .withFailureHandler(function(err) {
+
+      alert(err.message);
+
+    })
+    .approveVendor(currentRow, selections);
+
+}
+
+function createNewVendor() {
+
+  const confirmed = confirm(
+    "Create a new vendor?\n\nThis will add a new vendor to the Master Vendor Database."
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(function() {
+
+      alert("Vendor created.");
+
+      loadVendor();
+
+    })
+    .withFailureHandler(function(err) {
+
+      alert(err.message);
+
+    })
+    .createNewVendor(currentRow);
+
+}
+
+</script>
+
+</body>
+
+</html>
